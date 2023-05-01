@@ -1,0 +1,17 @@
+---
+- name: Check {{ path }} status
+  stat:
+    path: "{{ path }}"
+  register: res
+  with_items:
+    - "{{ items_to_check }}"
+- name: Create client request
+  expect:
+    command: "{{ command }}"
+    responses:
+      'Enter PEM pass phrase': '{{ responses1 }}'
+      'Verifying - Enter PEM pass phrase': '{{ responses2 }}'
+      'Common Name': '{{ responses3 }}'
+  with_items:
+    - "{{ res.results }}"
+  when: not item.stat.exists

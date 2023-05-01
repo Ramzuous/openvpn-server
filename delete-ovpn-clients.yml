@@ -1,0 +1,61 @@
+- hosts: vpn-server
+  gather_facts: false
+  vars_files:
+    vars_files/var_file_strings.yml
+  tasks:
+    - include_role:
+        name: expect
+        tasks_from: expect_revoke_client
+      vars:
+        path: "/{{ ansible_user }}/pki/issued/{{ item }}.crt"
+        items_to_check: "{{ ovpn_clients_to_remove }}"
+        command: sh "{{ easyrsa_skript_path }}" revoke "{{ item.item }}"
+        responses: 'yes'
+    - include_role:
+        name: file
+      vars:
+        path: "{{ crl_path }}"
+        state: absent
+        mode: '755'
+    - include_role:
+        name: command
+      vars:
+        command: "sh {{ easyrsa_skript_path }} gen-crl"
+    - include_role:
+        name: copy
+      vars:
+        src: "{{ crl_path }}"
+        dest: "{{ ovpn_path }}"
+    - include_role:
+        name: lineinfile
+      vars:
+        path: "{{ server_conf_path }}"
+        line: crl-verify crl.pem
+        state: present
+    - include_role:
+        name: systemd
+      vars:
+        name: openvpn@server
+        state: restarted
+        enabled: yes
+    - include_role:
+        name: file
+      vars:
+        path: "{{ ovpn_path }}/client/{{ item }}.key"
+        state: absent
+        mode: '755'
+      with_items: "{{ ovpn_clients_to_remove }}"
+    - include_role:
+        name: file
+      vars:
+        path: "{{ ovpn_path }}/client/{{ item }}.crt"
+        state: absent
+        mode: '755'
+      with_items: "{{ ovpn_clients_to_remove }}"      
+    - include_role:
+        name: file
+      vars:      
+        path: "{{ ovpn_path }}/{{ item }}"
+        state: absent
+        mode: '755'
+      with_items: "{{ ovpn_clients_to_remove }}"

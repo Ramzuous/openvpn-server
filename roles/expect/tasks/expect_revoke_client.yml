@@ -1,0 +1,15 @@
+---
+- name: Check {{ path }} status
+  stat:
+    path: "{{ path }}"
+  with_items:
+    - "{{ items_to_check }}"
+  register: res
+- name: Revoke client
+  expect:
+    command: "{{ command }}"
+    responses:
+      'C': '{{ responses }}'
+  with_items:
+    - "{{ res.results }}"
+  when: item.stat.exists

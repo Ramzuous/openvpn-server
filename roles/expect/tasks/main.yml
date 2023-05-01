@@ -1,0 +1,6 @@
+---    
+- name: Run {{ command }} with responses {{ responses }}
+  expect:
+    command: "{{ command }}"
+    responses:
+      'C': '{{ responses }}'

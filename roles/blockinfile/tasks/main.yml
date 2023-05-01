@@ -1,0 +1,16 @@
+---
+- name: Check {{ path_to_check }} status
+  stat:
+    path: "{{ path_to_check }}"
+  register: res
+  with_items:
+    - "{{ items_to_check }}"
+- name: Blockinfile for {{ path }}
+  blockinfile:
+     create: "{{ create }}"
+     path: "{{ path }}"
+     mode: '{{ mode }}'
+     block: "{{ block }}"
+  with_items:
+    - "{{ res.results }}"
+  when: not item.stat.exists

@@ -1,0 +1,6 @@
+---
+- name: Insert {{ line }} before {{ insertbefore }} to {{ path }}
+  lineinfile:
+    path: "{{ path }}"
+    line: "{{ line }}"
+    insertbefore: "{{ insertbefore }}"

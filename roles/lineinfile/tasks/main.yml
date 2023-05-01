@@ -1,0 +1,6 @@
+---
+- name: Set {{ state }} line {{ line }} to file {{ path }}
+  lineinfile:
+    path: "{{ path }}"
+    line: "{{ line }}"
+    state: "{{ state }}"

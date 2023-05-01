@@ -1,0 +1,6 @@
+---
+- name: State {{ state }} file {{ path }} in mode {{ mode }}
+  file:
+    path: "{{ path }}"
+    state: "{{ state }}"
+    mode: "{{ mode }}"

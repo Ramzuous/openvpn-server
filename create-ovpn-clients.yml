@@ -1,0 +1,192 @@
+- hosts: vpn-server
+  gather_facts: false
+  vars_files:
+    vars_files/var_file_strings.yml
+  tasks:
+    - include_role:
+        name: expect
+        tasks_from: expect_create_client_request
+      vars:
+        path: /{{ ansible_user }}/pki/private/{{ item.ovpn_client_name }}.key
+        items_to_check: "{{ ovpn_client_vars }}"
+        command: sh "{{ easyrsa_skript_path }}" gen-req "{{ item.item.ovpn_client_name }}" pass
+        responses1: '{{ item.item.ovpn_client_pass }}'
+        responses2: '{{ item.item.ovpn_client_pass }}'
+        responses3: '{{ item.item.ovpn_client_name }}'
+    - include_role:
+        name: expect
+        tasks_from: expect_sign_client_request
+      vars:
+        path: /{{ ansible_user }}/pki/issued/{{ item.ovpn_client_name }}.crt
+        items_to_check: "{{ ovpn_client_vars }}"
+        command: sh "{{ easyrsa_skript_path }}" sign-req client "{{ item.item.ovpn_client_name }}"
+        responses: 'yes'
+    - include_role:
+        name: copy
+      vars:
+        src: "{{ ca_path }}"
+        dest: "{{ ovpn_path }}/client"
+    - include_role:
+        name: copy
+      vars:
+        src: "/{{ ansible_user }}/pki/issued/{{ item.ovpn_client_name }}.crt"
+        dest: "{{ ovpn_path }}/client"
+      with_items:
+        - "{{ ovpn_client_vars }}"    
+    - include_role:
+        name: copy
+      vars:        
+        src: "/{{ ansible_user }}/pki/private/{{ item.ovpn_client_name }}.key"
+        dest: "{{ ovpn_path }}/client"
+      with_items:
+        - "{{ ovpn_client_vars }}"
+    - include_role:
+        name: file
+      vars:        
+        path: "{{ ovpn_path }}/{{ item.ovpn_client_name }}"
+        state: directory
+        mode: '755'
+      with_items:
+        - "{{ ovpn_client_vars }}"
+    - include_role:
+        name: blockinfile
+      vars:
+        path_to_check: "{{ ovpn_path }}/{{ item.ovpn_client_name }}/1-{{ item.ovpn_client_name }}.conf"
+        path: "{{ ovpn_path }}/{{ item.item.ovpn_client_name }}/1-{{ item.item.ovpn_client_name }}.conf"
+        items_to_check: "{{ ovpn_client_vars }}"
+        create : yes
+        mode: '755'
+        block: |
+          client
+          dev {{ vpn_server_dev }}
+          proto {{ vpn_server_proto }}
+          remote {{ ansible_host }} {{ vpn_server_port }}
+          resolv-retry infinite
+          nobind
+          user {{ vpn_server_user }}
+          group {{ vpn_server_group }}
+          persist-key
+          persist-tun
+          ca ca.crt
+          cert {{ item.item.ovpn_client_name }}.crt
+          key {{ item.item.ovpn_client_name }}.key
+          remote-cert-tls server
+          tls-auth ta.key 1
+          cipher {{ vpn_server_cipher }}
+          verb {{ vpn_server_verb }}
+    - include_role:
+        name: lineinfile
+        tasks_from: lineinfile_change_regexp
+      vars:
+        path: "{{ ovpn_path }}/{{ item.ovpn_client_name }}/1-{{ item.ovpn_client_name }}.conf"
+        regexp: "#"
+        state: absent
+      with_items:
+        - "{{ ovpn_client_vars }}"
+    - include_role:
+        name: copy
+      vars:
+        src: "{{ ovpn_path }}/client/ca.crt"
+        dest: "{{ ovpn_path }}/{{ item.ovpn_client_name }}/2-ca.crt"
+      with_items: 
+        - "{{ ovpn_client_vars }}"
+    - include_role:
+        name: copy
+      vars:
+        src: "{{ ovpn_path }}/ta.key"
+        dest: "{{ ovpn_path }}/{{ item.ovpn_client_name }}/5-ta.key"
+      with_items: 
+        - "{{ ovpn_client_vars }}"
+    - include_role:
+        name: copy
+      vars:
+        src: "{{ ovpn_path }}/client/{{ item.ovpn_client_name }}.crt"
+        dest: "{{ ovpn_path }}/{{ item.ovpn_client_name }}/3-{{ item.ovpn_client_name }}.crt"
+      with_items: 
+        - "{{ ovpn_client_vars }}"      
+    - include_role:
+        name: copy
+      vars:        
+        src: "{{ ovpn_path }}/client/{{ item.ovpn_client_name }}.key"
+        dest: "{{ ovpn_path }}/{{ item.ovpn_client_name }}/4-{{ item.ovpn_client_name }}.key"
+      with_items: 
+        - "{{ ovpn_client_vars }}"
+    - include_role:
+        name: assemble
+      vars:
+        src: "{{ ovpn_path }}/{{ item.item.ovpn_client_name }}"
+        dest: "{{ ovpn_path }}/{{ item.item.ovpn_client_name }}/{{ item.item.ovpn_client_name }}.ovpn"
+        path: "{{ ovpn_path }}/{{ item.ovpn_client_name }}/{{ item.ovpn_client_name }}.ovpn"
+        items_to_check: "{{ ovpn_client_vars }}"
+    - include_role:
+        name: lineinfile
+        tasks_from: lineinfile_insertafter
+      vars:
+        path: "{{ ovpn_path }}/{{ item.ovpn_client_name }}/{{ item.ovpn_client_name }}.ovpn"
+        line: <ca>
+        insertafter: 'verb'
+      with_items:
+        - "{{ ovpn_client_vars }}"
+    - include_role:
+        name: lineinfile
+        tasks_from: lineinfile_insertbefore
+      vars:
+        path: "{{ ovpn_path }}/{{ item.ovpn_client_name }}/{{ item.ovpn_client_name }}.ovpn"
+        line: </ca>
+        insertbefore: 'Certificate:'
+      with_items:
+        - "{{ ovpn_client_vars }}"
+    - include_role:
+        name: lineinfile
+        tasks_from: lineinfile_insertbefore
+      vars:
+        path: "{{ ovpn_path }}/{{ item.ovpn_client_name }}/{{ item.ovpn_client_name }}.ovpn"
+        line: <cert>
+        insertbefore: 'Certificate:'
+      with_items:
+        - "{{ ovpn_client_vars }}"        
+    - include_role:
+        name: lineinfile
+        tasks_from: lineinfile_insertbefore
+      vars:        
+        path: "{{ ovpn_path }}/{{ item.ovpn_client_name }}/{{ item.ovpn_client_name }}.ovpn"
+        line: </cert>
+        insertbefore: '-----BEGIN ENCRYPTED PRIVATE KEY-----'
+      with_items:
+        - "{{ ovpn_client_vars }}"
+    - include_role:
+        name: lineinfile
+        tasks_from: lineinfile_insertbefore
+      vars:         
+        path: "{{ ovpn_path }}/{{ item.ovpn_client_name }}/{{ item.ovpn_client_name }}.ovpn"
+        line: <key>
+        insertbefore: '-----BEGIN ENCRYPTED PRIVATE KEY-----'
+      with_items:
+        - "{{ ovpn_client_vars }}"
+    - include_role:
+        name: lineinfile
+        tasks_from: lineinfile_insertafter
+      vars:
+        path: "{{ ovpn_path }}/{{ item.ovpn_client_name }}/{{ item.ovpn_client_name }}.ovpn"
+        line: </key>
+        insertafter: '-----END ENCRYPTED PRIVATE KEY-----'
+      with_items:
+        - "{{ ovpn_client_vars }}"
+    - include_role:
+        name: lineinfile
+        tasks_from: lineinfile_insertafter
+      vars:        
+        path: "{{ ovpn_path }}/{{ item.ovpn_client_name }}/{{ item.ovpn_client_name }}.ovpn"
+        line: <tls-auth>
+        insertafter: '</key>'
+      with_items:
+        - "{{ ovpn_client_vars }}"
+    - include_role:
+        name: lineinfile
+        tasks_from: lineinfile_insertafter
+      vars: 
+        path: "{{ ovpn_path }}/{{ item.ovpn_client_name }}/{{ item.ovpn_client_name }}.ovpn"
+        line: </tls-auth>
+        insertafter: '-----END OpenVPN Static key V1-----'
+      with_items:
+        - "{{ ovpn_client_vars }}"

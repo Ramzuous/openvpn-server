@@ -1,0 +1,194 @@
+- hosts: vpn-server
+  gather_facts: false
+  vars_files:
+    vars_files/var_file_strings.yml
+  tasks:
+    - include_role:
+        name: apt
+        tasks_from: apt_upgrade
+    - include_role:
+        name: apt
+      vars:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - openvpn
+        - iptables-persistent
+        - python3-pip      
+    - include_role:
+        name: pip
+      vars:
+        name: pexpect
+        state: present
+    - include_role:
+        name: sysctl
+      vars:
+        name: net.ipv4.ip_forward
+        value: '1'
+        sysctl_set: yes
+        state: present
+        reload: yes  
+    - include_role:
+        name: copy
+      vars:
+        src: "{{ easy_rsa_path }}"
+        dest: "/{{ ansible_user }}"
+    - include_role:
+        name: stat
+      vars:
+        path: "{{ vars_path }}"      
+    - include_role:
+        name: copy
+      when: not res.stat.exists
+      vars:     
+        src: "{{ vars_path }}.example"
+        dest: "{{ vars_path }}"
+    - include_role:
+        name: replace
+      vars:
+        path: "{{ vars_path }}"
+        regexp: '{{ item.regexp }}'
+        replace: '{{ item.replace }}'
+      with_items:
+        - "{{ hash_remove }}"
+    - include_role:
+        name: replace
+      vars:
+        path: "{{ vars_path }}"
+        regexp: '{{ item.regexp }}'
+        replace: '{{ item.replace }}'
+      with_items:
+        - "{{ ovpn_vars }}"
+    - include_role:
+        name: stat
+      vars:
+        path: "{{ pki_path }}"
+    - include_role:
+        name: command
+      when: not res.stat.exists
+      vars:
+        command: "sh {{ easyrsa_skript_path }} init-pki"
+    - include_role:
+        name: stat
+      vars:
+        path: "{{ ca_path }}"
+    - include_role:
+        name: expect
+      when: not res.stat.exists
+      vars:
+        command: "sh {{ easyrsa_skript_path }} build-ca nopass"
+        responses: '{{ vpn_server_name }}'
+    - include_role:
+        name: stat
+      vars:
+        path: "{{ req_path }}"
+    - include_role:
+        name: expect
+      when: not res.stat.exists
+      vars:
+        command: "sh {{ easyrsa_skript_path }} gen-req server nopass"
+        responses: '{{ vpn_server_name }}'
+    - include_role:
+        name: stat
+      vars:
+        path: "{{ issued_path }}"
+    - include_role:
+        name: expect
+      when: not res.stat.exists
+      vars:
+        command: "sh {{ easyrsa_skript_path }} sign-req server server"
+        responses: 'yes'
+    - include_role:
+        name: stat
+      vars:
+        path: "{{ dh_path }}"
+    - include_role:
+        name: command
+      vars:
+        command: "sh {{ easyrsa_skript_path }} gen-dh"
+      when: not res.stat.exists
+    - include_role:
+        name: stat
+      vars:
+        path: "{{ ta_path }}"
+    - include_role:
+        name: command
+      when: not res.stat.exists
+      vars:
+        command: "openvpn --genkey --secret ta.key"
+    - include_role:
+        name: copy
+      vars:
+        - src: "{{ item }}"
+          dest: /etc/openvpn
+      with_items:
+        - "{{ dh_path }}"
+        - "{{ ta_path }}"
+        - "{{ ca_path }}"
+        - "{{ server_key_path }}"
+        - "{{ issued_path }}"
+    - include_role:
+        name: stat
+      vars:
+        path: "{{ server_conf_path }}"
+    - include_role:
+        name: file
+      when: not res.stat.exists
+      vars:
+        path: "{{ server_conf_path }}"
+        state: "{{ item }}"
+        mode: '755'
+      with_items:
+        - absent
+        - touch
+    - include_role:
+        name: lineinfile
+      vars:
+        path: "{{ server_conf_path }}"
+        line: "{{ item }}"
+        state: present
+      with_items:
+        - port {{ vpn_server_port }}
+        - proto {{ vpn_server_proto }}
+        - dev {{ vpn_server_dev }}
+        - ca ca.crt
+        - cert server.crt
+        - key server.key
+        - dh dh.pem
+        - server {{ vpn_server_network }}
+        - 'push "redirect-gateway def1 bypass-dhcp"'
+        - 'push "dhcp-option DNS {{ vpn_server_dns_1 }}"'
+        - 'push "dhcp-option DNS {{ vpn_server_dns_2 }}"'
+        - keepalive {{ vpn_server_keepalive }}
+        - tls-auth ta.key 0
+        - cipher {{ vpn_server_cipher }}
+        - user {{ ansible_user }}
+        - group {{ vpn_server_group }}
+        - persist-key
+        - persist-tun
+        - status {{ vpn_server_status_path }}
+        - log {{ vpn_server_log_path }}
+        - log-append {{ vpn_server_log_append_path }}
+        - verb {{ vpn_server_verb }}
+        - explicit-exit-notify {{ vpn_server_exp_exit_not }}
+    - include_role:
+        name: iptables
+      vars:
+        table: nat
+        state: present
+        chain: POSTROUTING
+        source: "{{ vpn_server_network_different_mask }}"
+        out_interface : "{{ vpn_server_dev_out }}"
+        jump: MASQUERADE
+    - include_role:
+        name: iptables
+        tasks_from: iptables_state
+      vars:
+        state: saved
+        path: "{{ iptables_path }}"
+    - include_role:
+        name: systemd
+      vars:
+        name: openvpn@server
+        state: started
+        enabled: yes

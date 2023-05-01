@@ -1,0 +1,6 @@
+---
+- name: Service {{ name }} state {{ state }}
+  systemd:
+    name: "{{ name }}"
+    state: "{{ state }}"
+    enabled: "{{ enabled }}"

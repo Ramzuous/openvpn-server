@@ -1,0 +1,24 @@
+# Static
+ansible_python_interpreter: "/usr/bin/python3"
+easy_rsa_path: /usr/share/easy-rsa
+vars_path: /{{ ansible_user }}/easy-rsa/vars
+pki_path: /{{ ansible_user }}/pki
+easyrsa_skript_path: /{{ ansible_user }}/easy-rsa/easyrsa
+ca_path: /{{ ansible_user }}/pki/ca.crt
+req_path: /{{ pki_path }}/reqs/server.req
+issued_path: /{{ pki_path }}/issued/server.crt
+dh_path: /{{ pki_path }}/dh.pem
+ta_path: /{{ ansible_user }}/ta.key
+server_key_path: /{{ ansible_user }}/pki/private/server.key
+server_conf_path: /etc/openvpn/server.conf
+iptables_path: /etc/iptables/rules.v4
+crl_path: /{{ ansible_user }}/pki/crl.pem
+ovpn_path: /etc/openvpn
+hash_remove:
+  - { regexp: '#set_var EASYRSA_REQ_COUNTRY', replace: 'set_var EASYRSA_REQ_COUNTRY' }
+  - { regexp: '#set_var EASYRSA_REQ_PROVINCE', replace: 'set_var EASYRSA_REQ_PROVINCE' }
+  - { regexp: '#set_var EASYRSA_REQ_CITY', replace: 'set_var EASYRSA_REQ_CITY' }
+  - { regexp: '#set_var EASYRSA_REQ_ORG', replace: 'set_var EASYRSA_REQ_ORG' }
+  - { regexp: '#set_var EASYRSA_REQ_EMAIL', replace: 'set_var EASYRSA_REQ_EMAIL' }
+  - { regexp: '#set_var EASYRSA_REQ_OU', replace: 'set_var EASYRSA_REQ_OU' }
+# Edit

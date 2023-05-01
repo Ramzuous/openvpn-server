@@ -1,0 +1,9 @@
+---
+- name: iptables {{ table }} {{ chain }} {{ source }} {{ out_interface }} {{ jump }} state {{ state }}
+  iptables:
+    table: "{{ table }}"
+    state: "{{ state }}"
+    chain: "{{ chain }}"
+    source: "{{ source }}"
+    out_interface : "{{ out_interface }}"
+    jump: "{{ jump }}"

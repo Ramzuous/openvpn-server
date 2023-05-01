@@ -1,0 +1,72 @@
+- hosts: vpn-server
+  gather_facts: false
+  vars_files:
+    vars_files/var_file_strings.yml
+  tasks:
+    - include_role:
+        name: systemd
+      vars:
+        name: openvpn@server
+        state: stopped
+        enabled: no
+    - include_role:
+        name: file
+      vars:
+        path: "{{ ovpn_path }}"
+        state: absent
+        mode: '755'
+    - include_role:
+        name: file
+      vars:
+        path: "/{{ ansible_user }}/easy-rsa"
+        state: absent
+        mode: '755'
+    - include_role:
+        name: file
+      vars:
+        path: "/{{ ansible_user }}/pki"
+        state: absent
+        mode: '755'
+    - include_role:
+        name: file
+      vars:
+        path: "/{{ ansible_user }}/ta.key"
+        state: absent
+        mode: '755'
+    - include_role:
+        name: file
+      vars:
+        path: "{{ iptables_path }}"
+        state: absent
+        mode: '755'
+    - include_role:
+        name: iptables
+      vars:
+        table: nat
+        state: absent
+        chain: POSTROUTING
+        source: "{{ vpn_server_network_different_mask }}"
+        out_interface : "{{ vpn_server_dev_out }}"
+        jump: MASQUERADE
+    - include_role:
+        name: sysctl
+      vars:
+        name: net.ipv4.ip_forward
+        value: '1'
+        sysctl_set: yes
+        state: absent
+        reload: yes        
+    - include_role:
+        name: pip
+      vars:
+        name: pexpect
+        state: absent
+    - include_role:
+        name: apt
+      vars:
+        name: "{{ item }}"
+        state: absent
+      with_items:
+        - openvpn
+        - iptables-persistent
+        - python3-pip      

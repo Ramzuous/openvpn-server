@@ -1,0 +1,14 @@
+---
+- name: Check {{ path }} status
+  stat:
+    path: "{{ path }}"
+  register: res
+  with_items:
+    - "{{ items_to_check }}"
+- name: Assemble {{ src }} to {{ dest }}
+  assemble:
+    src: "{{ src }}"
+    dest: "{{ dest }}"
+  with_items:
+    - "{{ res.results }}"
+  when: not item.stat.exists
